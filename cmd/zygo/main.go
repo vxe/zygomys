@@ -34,5 +34,7 @@ func main() {
 	}
 
 	// the library does all the heavy lifting.
-	zygo.ReplMain(cfg)
+	// zygo.ReplMain(cfg)
+	zygo.ReplMainLoadRc(cfg)
+        
 }

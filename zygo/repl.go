@@ -504,6 +504,85 @@ func ReplMain(cfg *ZlispConfig) {
 	}
 }
 
+func ReplMainLoadRC(cfg *ZlispConfig) {
+	var env *Zlisp
+	if cfg.LoadDemoStructs {
+		RegisterDemoStructs()
+	}
+	if cfg.Sandboxed {
+		env = NewZlispSandbox()
+	} else {
+		env = NewZlisp()
+	}
+	env.StandardSetup()
+	path, err := tilde.Expand("~/.zygorc")
+
+	
+	initfile, err  := os.Open(path)
+	fmt.Println(err)
+	env.LoadFile(initfile)
+        
+	if cfg.LoadDemoStructs {
+		// avoid data conflicts by only loading these in demo mode.
+		env.ImportDemoData()
+	}
+
+	if cfg.CpuProfile != "" {
+		f, err := os.Create(cfg.CpuProfile)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(-1)
+		}
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(-1)
+		}
+		defer pprof.StopCPUProfile()
+	}
+
+	precounts = make(map[string]int)
+	postcounts = make(map[string]int)
+
+	if cfg.CountFuncCalls {
+		env.AddPreHook(CountPreHook)
+		env.AddPostHook(CountPostHook)
+	}
+
+	if cfg.Command != "" {
+		_, err := env.EvalString(cfg.Command)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	args := cfg.Flags.Args()
+	if len(args) > 0 {
+		runScript(env, args[0], cfg)
+	} else {
+		Repl(env, cfg)
+	}
+
+	if cfg.MemProfile != "" {
+		f, err := os.Create(cfg.MemProfile)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(-1)
+		}
+		defer f.Close()
+
+		err = pprof.Lookup("heap").WriteTo(f, 1)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(-1)
+		}
+	}
+}
+
+
+
 func (env *Zlisp) ReplLineInfixWrap(line string) string {
 	return "{" + line + "}"
 }
